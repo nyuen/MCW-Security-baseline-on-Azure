@@ -700,7 +700,6 @@ In this exercise, attendees will utilize Network Security Groups to ensure that 
 
     ![The information above for port 80 (HTTP) is visible after running the script and pressing F5.](images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/image57.png)
 
-
 ### Task 2: Configure network security groups
 
 1. Switch to the [Azure Portal](https://portal.azure.com).
@@ -1333,6 +1332,8 @@ In this exercise, you will setup Azure Sentinel to point to a logging workspace 
 
 2. Search for the **Getting Started with Azure Sentinel Notebooks** item.
 
+    ![The notebook search results are displayed.](media/sentinel-getting-started-notebook.png "Search for the getting started notebook")
+
 3. In the right dialog, select **Launch Notebook**.
 
 4. If not already logged in, select your Azure credentials, the GitHub repo will start to clone into your workspace. You will see the GitHub progress meter.
@@ -1443,9 +1444,11 @@ In this exercise, attendees will learn to navigate the Azure Policy and Secure S
 
 11. For the Artifact Type, select **Policy assignment**, review all the policies available to you (at the time of this writing you would see 37 definitions and 311 policies).
 
-12. In the search box, type **unrestricted**, browse for the **Audit unrestricted network access to storage accounts**.
+12. In the search box, type **unrestricted**, browse for the **Storage accounts should restrict network access**.
 
     ![On the Create blueprint screen, on the Artifacts tab the + Add artifact link is selected beneath the Subscription. In the Add artifact blade, the artifact type of Policy assignment is selected. In the Search textbox, unrestricted is entered. Beneath the Search textbox, the Policy Definitions tab is selected and the Audit unrestricted network access to storage accounts is selected from the list of search results.](images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/image113.png "Add an artifact")
+
+    > **Note** If the above definition is not available, select one of your own choosing.
 
 13. Select **Add**.
 
