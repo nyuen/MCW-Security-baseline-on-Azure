@@ -905,7 +905,7 @@
         "typeHandlerVersion": "2.19",
         "autoUpgradeMinorVersion": true,
         "settings": {
-          "ModulesUrl": "https://github.com/Microsoft/MCW-Azure-security-privacy-and-compliance/blob/master/Hands-on%20lab/Scripts/Install_IIS.zip?raw=true",
+          "ModulesUrl": "https://github.com/microsoft/MCW-Security-baseline-on-Azure/blob/master/Hands-on%20lab/Scripts/Install_IIS.zip?raw=true",
           "ConfigurationFunction": "Install_IIS.ps1\\InstallIIS",
           "Properties": {
             "MachineName": "web-1"
@@ -929,7 +929,7 @@
         "autoUpgradeMinorVersion": true,
         "settings": {
           "fileUris" : [
-            "https://raw.githubusercontent.com/givenscj/MCW-Security-baseline-on-Azure/master/Hands-on%20lab/Scripts/Set_FirewallRule/Set_FirewallRule.ps1"
+            "https://raw.githubusercontent.com/microsoft/MCW-Security-baseline-on-Azure/master/Hands-on%20lab/Scripts/Set_FirewallRule/Set_FirewallRule.ps1"
           ],
           "commandToExecute" : "powershell.exe -ExecutionPolicy bypass -File Set_FirewallRule.ps1"
         },
