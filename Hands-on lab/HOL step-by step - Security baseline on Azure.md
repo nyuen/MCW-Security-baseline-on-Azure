@@ -1448,7 +1448,7 @@ In this exercise, attendees will learn to navigate the Azure Policy and Secure S
 
     ![On the Create blueprint screen, on the Artifacts tab the + Add artifact link is selected beneath the Subscription. In the Add artifact blade, the artifact type of Policy assignment is selected. In the Search textbox, unrestricted is entered. Beneath the Search textbox, the Policy Definitions tab is selected and the Audit unrestricted network access to storage accounts is selected from the list of search results.](images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/image113.png "Add an artifact")
 
-    > **Note** If the above definition is not available, select one of your own choosing.
+    > **Note**: If the above definition is not available, select one of your own choosing.
 
 13. Select **Add**.
 
