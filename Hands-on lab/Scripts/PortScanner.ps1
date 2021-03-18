@@ -336,12 +336,12 @@ function SetupHosts()
 		
 	if (!$content.contains("web-1"))
 	{
-		add-content $path "10.2.0.4`tweb-1";
+		add-content $path "10.1.0.4`tweb-1";
 	}
 	
 	if (!$content.contains("db-1"))
 	{
-		add-content $path "10.1.0.4`tdb-1";
+		add-content $path "10.1.1.4`tdb-1";
 	}
 }
 
