@@ -1,4 +1,4 @@
-![Microsoft Cloud Workshops](https://github.com/Microsoft/MCW-Template-Cloud-Workshop/raw/master/Media/ms-cloud-workshop.png "Microsoft Cloud Workshops")
+q![Microsoft Cloud Workshops](https://github.com/Microsoft/MCW-Template-Cloud-Workshop/raw/master/Media/ms-cloud-workshop.png "Microsoft Cloud Workshops")
 
 <div class="MCWHeader1">
 Security baseline on Azure
@@ -99,7 +99,7 @@ Contoso administrators recently learned about the Azure Security Center and have
 
 ![This diagram shows external access to Azure resources where Just In Time is utilize to lock down the Jump Machine. Azure Log Analytics with Azure Sentinel is then used to monitor the deny events on the network security groups.](images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/image2.png)
 
-The solution begins by creating a jump machine. This jump machine is used to access the virtual machines and other resources in the resource group. All other access is disabled via multiple **virtual networks**. More than one virtual network is required as having a single **virtual network** would cause all resource to be accessible based on the default currently un-customizable security group rules. Resources are organized into these virtual networks. **Azure Center Security** is utilized to do **Just-In-Time** access to the jump machine. This ensures that all access is audited to the jump machine and that only authorized IP-addressed are allowed access, this prevents random attacks on the virtual machines from bad internet actors. Additionally, applications are not allowed to be installed on the jump machine to ensure that malware never becomes an issue. Each of the virtual network and corresponding **network security groups** have logging enabled to record deny events to **Azure Logging**. These events are then monitored by a **custom alert rule** in **Azure Sentinel** to fire **custom alerts**. Once the solution is in place, the **Compliance Manager** tool is utilized to ensure that all GDPR based technical and business controls are implemented and maintained to ensure GDPR compliance.
+The solution begins by creating a jump machine. This jump machine is used to access the virtual machines and other resources in the resource group. All other access is disabled via isolated **virtual networks** for the management and the application. The application **virtual network** is split in separated subnet for each tier. Resources are organized into these virtual networks and subnets. **Azure Center Security** is utilized to do **Just-In-Time** access to the jump machine. This ensures that all access is audited to the jump machine and that only authorized IP-addressed are allowed access, this prevents random attacks on the virtual machines from bad internet actors. Additionally, applications are not allowed to be installed on the jump machine to ensure that malware never becomes an issue. Each of the virtual network and corresponding **network security groups** have logging enabled to record deny events to **Azure Logging**. These events are then monitored by a **custom alert rule** in **Azure Sentinel** to fire **custom alerts**. Once the solution is in place, the **Compliance Manager** tool is utilized to ensure that all GDPR based technical and business controls are implemented and maintained to ensure GDPR compliance.
 
 ## Requirements
 
@@ -716,7 +716,7 @@ In this exercise, attendees will utilize Network Security Groups to ensure that 
 
    - For the **Source**, select **IP Addresses**.
 
-   - For the **Source IP address**, enter **10.2.0.4**.
+   - For the **Source IP address**, enter **10.1.0.4*.
   
    - For the **Destination**, keep **Any**.
 
@@ -904,6 +904,93 @@ In this exercise, attendees will utilize Network Security Groups to ensure that 
 
     > **Note**: You should see the basic ports scanned, and then a port scan from 80 to 443. This will generate many security center logs for the Network Security Groups which will be used in the Custom Alert in the next set of exercises. Continue to the next exercise while the script executes.
 
+## Excercise 4.1 : Configure a Web Application Firewall with Azure Application Gateway
+
+Duration: 45 minutes
+
+Azure Web Application Firewall (WAF) on Azure Application Gateway provides centralized protection of your web applications from common exploits and vulnerabilities. Web applications are increasingly targeted by malicious attacks that exploit commonly known vulnerabilities. SQL injection and cross-site scripting are among the most common attacks.
+
+WAF on Application Gateway is based on Core Rule Set (CRS) 3.1, 3.0, or 2.2.9 from the Open Web Application Security Project (OWASP). The WAF automatically updates to include protection against new vulnerabilities, with no additional configuration needed.
+
+1. In the Azure Portal, use the search bar to lookup for **Application Gateways**
+![Search for App GW    .](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/search-app-gw.png "Search for AppGW")
+
+2. Click the **+ Add** button to create a new instance:
+    1. Select the **MCW-Security-RG** resource group
+    1. Configure the name of the App gateway instance to **web-app-gw**
+    1. Select the **same region** as the one selected in the deployment paremeters
+    1. Tier : **WAFv2**
+    1. Enable Auto-scalling: **no**
+    1. Instance count: **1**
+    1. Firewall status: **enabled**
+    1. Firewall mode: **prevention**
+    1. Availability zone: **none**
+    1. HTTP/2: **disabled**
+    1. Vnet: **mainVNet**
+    1. Subnet: **SharedServices(10.0.3.0/24)**
+
+    ![Create an Application Gateway instance](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/create-app-gw.png "Create an Application Gateway instance")
+
+3. Configure the FrontEnd, we will create a new public IP address:
+    1. Frontend IP address type: public
+
+    ![Configure front-end IP](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/create-appgw-frontend.png "Configure a Frontend IP")
+
+4. Add a backend pool, will reference our web application hosted on the Web-1 VM targeting the IIS server on port 80
+    1. name: **web-pool**
+    1. Add backend pool without target: **no**
+    1. IP-address: **10.1.0.4**. The Portal will only reference VMs in the same VNet
+
+    ![Configure Backend pool](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/backend-pool.png "Configure a backend pool")
+
+5. Add a routing rule
+    1. Rule name : **web-rule**
+    1. Listener
+        1. Listener name: **http**
+        1. frontend Ip: **public**
+        1. port: **80**
+        1. Listerner type: **basic**
+        1. Error page url: **no**
+    1. Backend targets
+        1. Target Type: **Backend Pool**
+        1. Backend Target: **web-pool**
+        1. Add New HTTP Settings:
+            1. HTTP settings name: **default**
+            1. Backend protocol: **http**
+            1. Backend port: **80**
+
+        ![Create App GW](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/create-app-gw2.png "Configure a backend pool")
+
+![Review App GW](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/review-appgw.png "Review App GW")
+
+Once the App gateway instance is created, retrieve the public IP address and confirm that the website hosted on Web-1 is accessible through the AppGW
+
+![Review App GW](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/appgw-ip.png "Ip address")
+
+Configure the Diagnostic Logs for App Gateway. On the left menu select Monitoring -> Diagnostic logs and configure:
+
+- Diagnostic settings name: appgw-diag
+- ApplicationGatewayAccessLog
+- ApplicationGatewayPerformanceLog
+- ApplicationGatewayFirewallLog
+- All Metrics
+
+Destination detail: send to Log Analytics and select the **azseclog\*** workspace
+![app GW diagnostics](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/appgw-diag.png "Enable diagnostics for AppGW")
+
+Make sure the Application Gateway Web Application Firewall is set to **Prevention**
+Destination detail: send to Log Analytics and select the **azseclog\*** workspace
+![App GW prevention](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/appgw-prevention.png "AppGW prevention")
+
+Test the Web Application Firewall:
+
+- SQL injection: http:/xxx.xxx.xxx.xxx/?category=Gifts%27+OR+1=1--
+- Cross site scripting: http:/xxx.xxx.xxx.xxx/& echo “<?php system($_GET[‘cmd’]); ?>” > cmd.php
+- Cross site scripting: http:/xxx.xxx.xxx.xxx/eval(‘sleep 5’)
+- Path Traversal: http:/xxx.xxx.xxx.xxx/api/user?get-files?file=../../../../some%20dir/some%20file
+
+Notice that these requests are blocked directly by the Azure App Gateway Web Application Firewall feature. The WAF returns a **403** - forbidden code
+
 ## Exercise 5: Azure Security Center
 
 Duration: 45 minutes
@@ -918,7 +1005,7 @@ Azure Security Center provides several advanced security and threat detection ab
 
 2. In the blade, select **Agents management**.
 
-3. Record the `Workspace ID` and the `Primary key` values.
+3. Record the `Workspace ID` and the `Primary key` values.V
 
    ![Agents management blade link is highlighted along with the id and key for the workspace](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/LogAnalyticsWorkspace_Settings.png "Copy the workspace id and key")
 

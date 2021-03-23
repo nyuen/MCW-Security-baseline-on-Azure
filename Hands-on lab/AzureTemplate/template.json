@@ -44,7 +44,7 @@
             "type": "microsoft.operationalinsights/workspaces",
             "name": "[concat('azseclog', uniqueString(resourceGroup().id))]",
             "apiVersion": "2015-11-01-preview",
-            "location": "eastus",
+            "location": "[resourceGroup().location]",
             "scale": null,
             "properties": {
                 "sku": {
@@ -245,20 +245,27 @@
     },
     {
       "type": "Microsoft.Network/virtualNetworks",
-      "name": "dbVnet",
+      "name": "appVnet",
       "apiVersion": "2017-08-01",
       "location": "[resourceGroup().location]",
       "properties": {
         "addressSpace": {
           "addressPrefixes": [
-            "10.1.0.0/24"
+            "10.1.0.0/22"
           ]
         },
         "subnets": [
           {
-            "name": "default",
+            "name": "web",
             "properties": {
               "addressPrefix": "10.1.0.0/24",
+              "networkSecurityGroup": null
+            }
+          },
+          {
+            "name": "db",
+            "properties": {
+              "addressPrefix": "10.1.1.0/24",
               "networkSecurityGroup": null
             }
           }
@@ -273,7 +280,7 @@
       "properties": {
         "addressSpace": {
           "addressPrefixes": [
-            "10.0.0.0/16"
+            "10.0.0.0/21"
           ]
         },
         "subnets": [
@@ -282,26 +289,23 @@
             "properties": {
               "addressPrefix": "10.0.0.0/24"
             }
-          }
-        ]
-      }
-    },
-    {
-      "type": "Microsoft.Network/virtualNetworks",
-      "name": "webVNet",
-      "apiVersion": "2017-08-01",
-      "location": "[resourceGroup().location]",
-      "properties": {
-        "addressSpace": {
-          "addressPrefixes": [
-            "10.2.0.0/16"
-          ]
-        },
-        "subnets": [
+          },
           {
-            "name": "default",
+            "name": "AzureFirewallSubnet",
             "properties": {
-              "addressPrefix": "10.2.0.0/24"
+              "addressPrefix": "10.0.1.0/24"
+            }
+          },
+          {
+            "name": "GatewaySubnet",
+            "properties": {
+              "addressPrefix": "10.0.2.0/24"
+            }
+          },
+          {
+            "name": "SharedServices",
+            "properties": {
+              "addressPrefix": "10.0.3.0/24"
             }
           }
         ]
@@ -309,11 +313,11 @@
     },
     {
       "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
-      "name": "[concat('mainVNet', '/', 'main_to_db')]",
+      "name": "[concat('mainVNet', '/', 'main_to_app')]",
       "apiVersion": "2017-06-01",
       "properties": {
         "remoteVirtualNetwork": {
-          "id": "[resourceId('Microsoft.Network/virtualNetworks', 'dbVnet')]"
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', 'appVnet')]"
         },
         "allowVirtualNetworkAccess": true,
         "allowForwardedTraffic": true,
@@ -322,12 +326,12 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.Network/virtualNetworks', 'mainVNet')]",
-        "[resourceId('Microsoft.Network/virtualNetworks', 'dbVnet')]"
+        "[resourceId('Microsoft.Network/virtualNetworks', 'appVnet')]"
       ]
     },
     {
       "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
-      "name": "[concat('dbVnet', '/', 'db_to_main')]",
+      "name": "[concat('appVnet', '/', 'app_to_main')]",
       "apiVersion": "2017-06-01",
       "properties": {
         "remoteVirtualNetwork": {
@@ -340,43 +344,7 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.Network/virtualNetworks', 'mainVNet')]",
-        "[resourceId('Microsoft.Network/virtualNetworks', 'dbVnet')]"
-      ]
-    },
-    {
-      "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
-      "name": "[concat('mainVNet', '/', 'main_to_web')]",
-      "apiVersion": "2017-06-01",
-      "properties": {
-        "remoteVirtualNetwork": {
-          "id": "[resourceId('Microsoft.Network/virtualNetworks', 'webVNet')]"
-        },
-        "allowVirtualNetworkAccess": true,
-        "allowForwardedTraffic": true,
-        "allowGatewayTransit": true,
-        "useRemoteGateways": false
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Network/virtualNetworks', 'mainVNet')]",
-        "[resourceId('Microsoft.Network/virtualNetworks', 'webVNet')]"
-      ]
-    },
-    {
-      "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
-      "name": "[concat('webVNet', '/', 'web_to_main')]",
-      "apiVersion": "2017-06-01",
-      "properties": {
-        "remoteVirtualNetwork": {
-          "id": "[resourceId('Microsoft.Network/virtualNetworks', 'mainVNet')]"
-        },
-        "allowVirtualNetworkAccess": true,
-        "allowForwardedTraffic": true,
-        "allowGatewayTransit": true,
-        "useRemoteGateways": false
-      },
-      "dependsOn": [
-        "[resourceId('Microsoft.Network/virtualNetworks', 'mainVNet')]",
-        "[resourceId('Microsoft.Network/virtualNetworks', 'webVNet')]"
+        "[resourceId('Microsoft.Network/virtualNetworks', 'appVnet')]"
       ]
     },
     {
@@ -579,6 +547,90 @@
         "publicIpAllocationMethod": "Dynamic"
       }
     },
+      {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2019-07-01",
+      "name": "linux-1",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/networkInterfaces/', 'linux-1-nic')]",
+        "[concat('Microsoft.Storage/storageAccounts/', variables('diagStorageAccountName'))]"
+      ],
+      "properties": {
+          "hardwareProfile": {
+              "vmSize": "Standard_DS1_v2"
+          },
+          "storageProfile": {
+              "imageReference": {
+                  "publisher": "Canonical",
+                  "offer": "UbuntuServer",
+                  "sku": "18.04-LTS",
+                  "version": "latest"
+              },
+              "osDisk": {
+                  "osType": "Linux",
+                  "name": "linux-1-os",
+                  "createOption": "FromImage",
+                  "caching": "ReadWrite",
+                  "managedDisk": {
+                      "storageAccountType": "Premium_LRS"
+                  },
+                  "diskSizeGB": 30
+              },
+              "dataDisks": []
+          },
+          "osProfile": {
+              "computerName": "linux-1",
+              "adminUsername": "[parameters('adminUsername')]",
+              "adminPassword": "[parameters('adminPassword')]",
+              "linuxConfiguration": {
+                  "disablePasswordAuthentication": false,
+                  "provisionVMAgent": true
+              },
+              "secrets": [],
+              "allowExtensionOperations": true
+          },
+          "networkProfile": {
+              "networkInterfaces": [
+                  {
+                      "id": "[resourceId('Microsoft.Network/networkInterfaces', 'linux-1-nic')]"
+                  }
+              ]
+          },
+          "diagnosticsProfile": {
+              "bootDiagnostics": {
+                  "enabled": true,
+                  "storageUri": "[reference(resourceId(resourceGroup().name, 'Microsoft.Storage/storageAccounts', variables('diagStorageAccountName')), '2015-06-15').primaryEndpoints['blob']]"
+              }
+          }
+      }
+  },
+  {
+    "name": "linux-1-nic",
+    "type": "Microsoft.Network/networkInterfaces",
+    "apiVersion": "2016-09-01",
+    "location": "[resourceGroup().location]",
+    "dependsOn": [
+      "[concat('Microsoft.Network/virtualNetworks/', 'mainVNet')]",
+      "[concat('Microsoft.Network/networkSecurityGroups/', 'paw-1-nsg')]"
+    ],
+    "properties": {
+      "ipConfigurations": [
+        {
+          "name": "ipconfig1",
+          "properties": {
+            "subnet": {
+              "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', 'mainVNet', 'default')]"
+            },
+            "privateIPAllocationMethod": "Dynamic"
+          }
+        }
+      ],
+      "networkSecurityGroup": {
+        "id": "[resourceId(resourceGroup().name, 'Microsoft.Network/networkSecurityGroups', 'paw-1-nsg')]"
+      }
+    }
+  },
     {
       "name": "db-1",
       "type": "Microsoft.Compute/virtualMachines",
@@ -636,7 +688,7 @@
       "apiVersion": "2016-09-01",
       "location": "[resourceGroup().location]",
       "dependsOn": [
-        "[concat('Microsoft.Network/virtualNetworks/', 'dbVnet')]",
+        "[concat('Microsoft.Network/virtualNetworks/', 'appVnet')]",
         "[concat('Microsoft.Network/networkSecurityGroups/', 'DbTrafficOnly')]"
       ],
       "properties": {
@@ -645,7 +697,7 @@
             "name": "ipconfig1",
             "properties": {
               "subnet": {
-                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', 'dbVNet', 'default')]"
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', 'appVNet', 'db')]"
               },
               "privateIPAllocationMethod": "Dynamic"
             }
@@ -714,7 +766,7 @@
       "location": "[resourceGroup().location]",
       "dependsOn": [
         "[concat('Microsoft.Network/publicIpAddresses/', 'web-1-ip')]",
-        "[concat('Microsoft.Network/virtualNetworks/', 'webVNet')]",
+        "[concat('Microsoft.Network/virtualNetworks/', 'appVNet')]",
         "[concat('Microsoft.Network/networkSecurityGroups/', 'WebTrafficOnly')]"
       ],
       "properties": {
@@ -723,7 +775,7 @@
             "name": "ipconfig1",
             "properties": {
               "subnet": {
-                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', 'webVNet', 'default')]"
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', 'appVNet', 'web')]"
               },
               "privateIPAllocationMethod": "Dynamic",
               "publicIpAddress": {
@@ -761,7 +813,7 @@
         "typeHandlerVersion": "2.19",
         "autoUpgradeMinorVersion": true,
         "settings": {
-          "ModulesUrl": "https://github.com/Microsoft/MCW-Azure-security-privacy-and-compliance/blob/master/Hands-on%20lab/Scripts/Install_IIS.zip?raw=true",
+          "ModulesUrl": "https://github.com/microsoft/MCW-Azure-security-privacy-and-compliance/blob/master/Hands-on%20lab/Scripts/Install_IIS.zip?raw=true",
           "ConfigurationFunction": "Install_IIS.ps1\\InstallIIS",
           "Properties": {
             "MachineName": "web-1"
