@@ -980,18 +980,218 @@ Destination detail: send to Log Analytics and select the **azseclog\*** workspac
 
 Make sure the Application Gateway Web Application Firewall is set to **Prevention**
 Destination detail: send to Log Analytics and select the **azseclog\*** workspace
-![App GW prevention](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/appgw-prevention.png "AppGW prevention")
+≈
 
 Test the Web Application Firewall:
 
-- SQL injection: http:/xxx.xxx.xxx.xxx/?category=Gifts%27+OR+1=1--
-- Cross site scripting: http:/xxx.xxx.xxx.xxx/& echo “<?php system($_GET[‘cmd’]); ?>” > cmd.php
-- Cross site scripting: http:/xxx.xxx.xxx.xxx/eval(‘sleep 5’)
-- Path Traversal: http:/xxx.xxx.xxx.xxx/api/user?get-files?file=../../../../some%20dir/some%20file
+- SQL injection: **`http:/xxx.xxx.xxx.xxx/?category=Gifts%27+OR+1=1--`****
+- Cross site scripting: **`http:/xxx.xxx.xxx.xxx/& echo “<?php system($_GET[‘cmd’]); ?>” > cmd.php`**
+- Cross site scripting: **`http:/xxx.xxx.xxx.xxx/eval(‘sleep 5’)`**
+- Path Traversal:**` http:/xxx.xxx.xxx.xxx/api/user?get-files?file=../../../../some%20dir/some%20file`**
 
-Notice that these requests are blocked directly by the Azure App Gateway Web Application Firewall feature. The WAF returns a **403** - forbidden code
+Notice that these requests are blocked directly by the Azure App Gateway Web Application Firewall feature. The WAF returns a **403** - forbidden code:
+
+**The Application Gateway WAF can be configured to run in the following two modes:**
+
+- **Detection mode**: Monitors and logs all threat alerts. You turn on logging diagnostics for Application Gateway in the Diagnostics section. You must also make sure that the WAF log is selected and turned on. Web application firewall doesn't block incoming requests when it's operating in Detection mode.
+- **Prevention mode**: Blocks intrusions and attacks that the rules detect. The attacker receives a "403 unauthorized access" exception, and the connection is closed. Prevention mode records such attacks in the WAF logs.
+
+You can now review the logs after making several request to the Application through the App Gateway. You can access the Resource specific logs through the Azure Portal on Monitoring -> Logs.
+
+The sample *KQL* query returns all blocked requests in the past 10 days from the current time:
+
+```KQL
+AzureDiagnostics  | where TimeGenerated > ago(10d) 
+                  | where Category == "ApplicationGatewayFirewallLog" and action_s == "Blocked" 
+                  | project TimeGenerated, Resource, requestUri_s, Message, clientIp_s, details_message_s
+```
+
+![AppGW FW logs ](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/appgw-logs.png "AppGW Logs")
+
+You can run the same request through the Azure CLI using `az monitor logs-analytics`:
+
+```bash
+az monitor log-analytics query --analytics-query 'AzureDiagnostics  | where TimeGenerated > ago(10d) | where Resource == "WEB-APP-GW" | where Category == "ApplicationGatewayFirewallLog" and action_s == "Blocked" | project TimeGenerated, Resource, requestUri_s, Message, clientIp_s, details_message_s' --workspace xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx -o json
+
+[
+  {
+    "Message": "Mandatory rule. Cannot be disabled. Inbound Anomaly Score Exceeded (Total Score: 5)",
+    "Resource": "WEB-APP-GW",
+    "TableName": "PrimaryResult",
+    "TimeGenerated": "2021-03-20T07:41:20.398Z",
+    "clientIp_s": "113.75.189.52",
+    "details_message_s": "Access denied with code 403 (phase 2). Operator GE matched 5 at TX:anomaly_score. ",
+    "requestUri_s": "/GponForm/diag_Form"
+  }
+  ...
+]
+```
+
+## Exercise 4.2: Azure Firewall
+
+Duration: 45 minutes
+
+Azure Firewall is a managed, cloud-based network security service that protects your Azure Virtual Network resources. It's a fully stateful firewall as a service with built-in high availability and unrestricted cloud scalability.
+
+![Firewall Threat](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/firewall-threat.png "Firewall Threat")
+
+### Create the Azure Firewall Resource
+
+1. In the Azure portal search for **Firewalls** in the top bar
+1. Click on **Create a firewall**
+    1. Select the MCW-Security-RG resource group
+    1. Name: **mcw-security-fw**
+    1. Region: **The region where you created the other resources** (e.g Southeast Asia)
+    1. Availability Zone: **None**
+    1. Firewall tier: **Standard**
+    1. Firewall management: **Use Firewall rules (classic) to manage this firewall**
+    1. Choose a Virtual Network: **Use existing**
+    1. Virtual Network: **mainVNet (MCW-Security-RG)**
+    1. Public IP address: Select Add New (Name: **firewall-ip**)
+    1. Forced Tunneling: **Disabled**
+
+
+![Create an Azure Firewall](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/firewall-create.png "Create an Azure Firewall")
+
+
+![Firewall Deployment](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/firewall-deploy.png "Firewall deployment")
+
+The Azure Firewall instance is now created and is deployed in mainVNet/AzureFirewallSubnet with a new Public IP address
+
+### Creating a default route
+
+At this stage the traffic is not flowing yet through our managed Firewall, to do so we need to create a Default Route
+
+1. In the Azure search bar, lookup for **Route Tables**
+1. Click on Create:
+    1. Resource Group: **MCW-Security-RG**
+    1. Region: **The region where you deployed the workloads** e.g SouthEast Asia
+    1. Name: **default-fw-route**
+    1. Propagate gateway routes: **no** as we don't have on-Prem connectivity
+
+![Create a Default Route](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/firewall-route.png "Create a default route table")
+
+**Edit the route table to add a default route pointing to our Azure Firewall Instance:**
+
+1. Open the newly created route table
+1. In Settings->Routes click on Add
+    1. Route name: **default-fw**
+    1. address prefix: **0.0.0.0/0**
+    1. Next hop type: **Virtual Appliance**, *Azure Firewall is actually a managed service, but virtual appliance works in this situation.*
+    1. Next hope address: type the private IP address for the firewall, it should be **10.0.1.4**
+    1. Click on **Ok**
+1. Add a second route to prevent the inter-VNet traffic from flowing through the Firewall:
+    1. Route name: **vnet-route**
+    1. address prefix: **10.0.0.0/16**
+    1. Next hop type: **Virtual Network**
+    1. Click on **Ok**
+
+![Add route](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/firewall-addroute.png "Add route")
+
+**Associate the route table to our subnets**:
+
+1. On the route table select **Settings->Subnets**
+1. Click on **+ Associate**
+    1. Select **mainVnet**
+        1. Select **default** subnet
+    1. Repeat the operation for:
+        1. Vnet: **appVnet**
+            1. Subnet: **web** and **db**
+
+We've now defined routes flowing through Azure firewall instance deployed in the mainVNet.
+
+### Connecting to the PAW VM
+
+If you try to access the VM through its public IP address you'll notice that it is not accessible anymore.
+
+To Connect to the VM, request a new JIT access. JIT is fully integrated with Azure Firewall and automatically creates a NAT rule to access our VM from the public IP address or Azure Firewall.
+
+![JIT Nat rule](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/firewall-nat.png "JIT Nat Rule")
+
+In the screenshot above notice that each JIT request generates a new entry in the **ASC-JIT** NAT Rule.
+
+We can now access our VM though *FIREWALL-IP:13389* using a regular RDP connection
+
+### Configuring required network access
+
+The firewall has a deny policy by default, which means that most of the inbound and outbound traffic to our instances protected by our Azure Firewall instance will be blocked.
+
+Let's connect back to our PAW VM and try to access a few websites:
+
+1. Open Chrome and try to access your favourite search engine <https://wwww.bing.com>
+    1. Notice that the website is not accessible
+1. Navigate to the Web application path /api/users either through the PublicIP behind the App Gateway or throughthe internal IP address
+    1. Notice that the application is responding but generates an error
+
+The Firewall is blocking all outbound traffic, which means that access to external website but also to Azure PaaS servies is blocked. We need to enable access to theses two services.
+
+![Application error](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/firewall-app-error.png "Application error")
+
+#### Firewall Application rule
+
+Create an Application rule to allow access to Bing:
+
+1. Navigate to the mcw-security-fw Firewall Instance
+1. Select **Settings->Rules (classic)**
+1. Select **Application Rule Collection -> Add Application Rule**
+    1. Name: **Bing**
+    2. Priority: **1000**
+    3. Action: **Allow**
+    4. Target FQDNs:
+    5. name: **bing**
+    6. Source type: **IP address**
+    7. Source: **\*** (we want all our VMs to access bing)
+    8. Protocol,port: **Http:80,Https:443**
+    9. Target FQDNs: **\*.bing.com**
+
+![Allow Bing access](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/firewall-allow-bing.png "Firewall - allow bing access")
+
+You should have access to bing on all the VMs, you can try to refresh the page on Chrome to validate that the configuration is successful.
+
+![Validate Bing access](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/firewall-bing-ok.png "Firewall - validate bing access")
+
+#### Firewall Network rules
+
+Let's now focus on our Database access, we have deployed two databases for the demo:
+
+- An Azure SQL Database as a PaaS service
+- A traditional SQL server running on a VM in the DB subnet (IaaS)
+
+The web application hosted in the Web subnet is currently configured to access the PaaS service which is currently blocked by our Fireall rules. You can also try to access the database from the PAW VM using SQL Server Management Studio but the access is also blocked.
+
+Create a Network Rule Collection to enable access to the PaaS Service:
+
+1. Navigate to the mcw-security-fw Firewall Instance
+1. Select **Settings->Rules (classic)**
+1. Select **Network Rule Collection -> Add Network Rule**
+    1. Priority: **1001**
+    1. Action: **Allow**
+    1. Service Tags:
+        1. name: **SQL**
+        1. Protocol: **TCP**
+        1. Source type: **IP address**
+        1. Source: **10.1.0.4,10.0.0.4** (we want all our VMs to access bing)
+        1. Service Tags: **SQL.southeastasia** (change the region according to your deployment settings)
+        1. Destination Ports: **1433**
+
+![Firewall SQL Rule](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/firewall-sql-rule.png "Firewall - Enable SQL Access")
+
+Both the PAW-1 and Web-1 VM should now have access to the Azure SQL Database instances hosted in the SouthEast Asia region (or the region selected during your deployment)
+
+Refresh the wen application page to confirm that the Network Rule collection is correctly configured and notice that the records from the Insurance database are displayed.
+
+![Validate Firewall SQL Rule](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/firewall-sql-rule.png "Firewall - Validate SQL Access")
+
+### Enabling Firewall Diagnostic Logs
+
+Configure the Azure Diagnostic Logs to gather additional information and metrics from our Azure Firewall Instance
+
+## Exercise 4.3: NSG Flow Logs and Traffic Analytics
 
 ## Exercise 5: Azure Security Center
+
+helm install azure-policy-addon azure-policy/azure-policy-addon-arc-clusters --set azurepolicy.env.resourceid="/subscriptions/6f3097c6-c15a-44e4-89ba-990aa1a690ec/resourceGroups/ARC-RG/providers/Microsoft.Kubernetes/connectedClusters/Arc-MicroK8s-Demo" --set azurepolicy.env.clientid="d4a95aaa-8556-4555-95f0-e74ca7c8bafe" --set azurepolicy.env.clientsecret="O~sv0.x-aw9pJ.~Lf42jIoJg0rcfK0vKTK" --set azurepolicy.env.tenantid="72f988bf-86f1-41af-91ab-2d7cd011db47"
+
 
 Duration: 45 minutes
 
