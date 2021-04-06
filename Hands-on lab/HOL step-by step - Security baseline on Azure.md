@@ -1186,7 +1186,47 @@ Refresh the wen application page to confirm that the Network Rule collection is 
 
 Configure the Azure Diagnostic Logs to gather additional information and metrics from our Azure Firewall Instance
 
-## Exercise 4.3: NSG Flow Logs and Traffic Analytics
+## Exercise 4.3: Add private link
+
+Duration: 20 minutes
+
+Azure Private Link provides private connectivity from a virtual network to Azure platform as a service (PaaS), customer-owned, or Microsoft partner services. It simplifies the network architecture and secures the connection between endpoints in Azure by eliminating data exposure to the public internet.
+
+We will secure the access to the Azure SQL database using private link.
+
+Select the Azure SQL server resource in the MCW resource group and choose security->Private Endpoint connections in the menu
+
+![private endpoint](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/sql-privatelink.png "SQL - private endpoint menu")
+![private endpoint](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/sql-privatelink-basic.png "SQL - private endpoint basic")
+![private endpoint](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/sql-privatelink-select-resource.png "SQL - private endpoint basic")
+
+Target the mainVnet and select the DB subnet, the private endpoint configuration will create a NIC in the subnet with a private IP address. Select 'YES' for the Private DNS integration, the private endpoint configuration will automatically create a new entry that can be resolved in the mainVNet
+
+![private endpoint](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/sql-privatelink-create-endpoint.png "SQL - private endpoint network config")
+
+Click on validate
+
+![private endpoint](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/sql-privatelink-validated.png "SQL - private endpoint - validated")
+
+Finally click create and notice that the private endpoint configuration created multiple Azure Resources
+
+![private endpoint](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/sql-privatelink-deployment.png "SQL - private endpoint deployment")
+
+Let's review the DB Subnet, a new NIC has been created that maps to our private endpoint
+
+![private endpoint](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/sql-private-link-nic.png "SQL - private endpoint NIC")
+
+An Azure DNS private zone mapped to privatelink.database.windows.net has also been created with one entry for our Azure SQL DB
+
+![private endpoint](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/sql-privatelink-dns.png "SQL - DNS private zone")
+
+Finally let's make sure that our application is still working, access our User API through the APP GW public IP. We can also connect to both the PAW and WEB instances, while the PAW instance cannot resolve the private endpoint since the private DNS zone is not mapped to the Vnet. On the other hand the mainVnet, linked to the Azure DNS private zone, can successfully resolved the FQDN of our Azure SQL server instance to a private IP address.
+
+The private endpoint is working as expected we didn't even have to change the code of our web application.
+
+![private endpoint](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/sql-privatelink-lookup-paw.png "SQL - NSLookup PAW")
+
+![private endpoint](/Hands-on%20lab/images/Hands-onlabstep-bystep-Azuresecurityprivacyandcomplianceimages/media/sql-privatelink-lookup-web.png "SQL - NSLookup web")
 
 ## Exercise 5: Azure Security Center
 
